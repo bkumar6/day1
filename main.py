@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.orm import Session
 import json
+import asyncio 
 
 from database import engine, Base, get_db
 from models import User
@@ -68,13 +69,13 @@ app.add_middleware(
 )
 
 
-# --- Startup Event ---
+# --- Startup Event (FINAL FIX) ---
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     """
-    Initialize Gemini client ONCE when the app starts.
+    Initialize Gemini client ASYNCHRONOUSLY when the app starts.
     """
-    initialize_ai_client()
+    await initialize_ai_client()
 
 
 # --- REST API ---
