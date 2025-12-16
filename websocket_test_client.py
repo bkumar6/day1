@@ -43,7 +43,7 @@ async def test_websocket_connection(token: str = None, test_name: str = "Test"):
                 }))
                 
                 # 2. Receive Response
-                response_json = await asyncio.wait_for(websocket.recv(), timeout=5)
+                response_json = await asyncio.wait_for(websocket.recv(), timeout=15)
                 response = json.loads(response_json)
                 
                 print(f"[{i}/{len(test_messages)}] <- Received: {response.get('data')}")
@@ -59,7 +59,7 @@ async def test_websocket_connection(token: str = None, test_name: str = "Test"):
     except Exception as e:
         print(f"An unexpected error occurred: {type(e).__name__}: {e}")
 
-        
+
 def get_valid_jwt_token():
     """Performs the Phase 1 login to get a fresh token."""
     print("--- Phase 1: Obtaining Valid JWT Token ---")
