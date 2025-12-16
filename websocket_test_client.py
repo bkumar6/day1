@@ -40,7 +40,7 @@ async def test_websocket_connection(token: str = None, test_name: str = "Test"):
             response_json = await asyncio.wait_for(websocket.recv(), timeout=5)
             response = json.loads(response_json)
             
-            print(f"<- Received AI response (Type: {response.get('type')}): {response.get('data')[:50]}...")
+            print(f"<- Received AI response (Type: {response.get('type')}): {response.get('data')}...")
             
     except websockets.exceptions.InvalidURI as e:
         print(f"❌ FAILURE: Invalid URI. Check configuration. Error: {e}")
