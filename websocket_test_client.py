@@ -5,13 +5,14 @@ import json
 import time
 
 # --- CONFIGURATION (Match your backend settings) ---
-REST_API_URL = "http://day1-backend-test.onrender.com/api/v1/auth/login" # Replace with your Render/VPS URL if deployed
-WS_URI_BASE = "wss://day1-backend-test.onrender.com/api/v1/ai/chat" # Replace with your Render/VPS URL if deployed
+# NOTE: Use HTTPS for Render deployments!
+REST_API_URL = "https://day1-backend-test.onrender.com/api/v1/auth/login" # Updated to HTTPS
+WS_URI_BASE = "wss://day1-backend-test.onrender.com/api/v1/ai/chat" 
 TEST_USER = "testuser"
 TEST_PASS = "password123"
 
 async def test_websocket_connection(token: str = None, test_name: str = "Test"):
-    """Attempts to establish a WebSocket connection."""
+    """Attempts to establish a WebSocket connection and exchange a message."""
     
     ws_uri = WS_URI_BASE
     if token:
@@ -37,10 +38,12 @@ async def test_websocket_connection(token: str = None, test_name: str = "Test"):
             }))
             
             # 3. Wait for the response
+            # Use asyncio.wait_for to prevent blocking indefinitely
             response_json = await asyncio.wait_for(websocket.recv(), timeout=5)
             response = json.loads(response_json)
             
-            print(f"<- Received AI response (Type: {response.get('type')}): {response.get('data')}...")
+            # Print the entire response data
+            print(f"<- Received AI response (Type: {response.get('type')}): {response.get('data')}")
             
     except websockets.exceptions.InvalidURI as e:
         print(f"❌ FAILURE: Invalid URI. Check configuration. Error: {e}")
@@ -57,6 +60,7 @@ def get_valid_jwt_token():
     """Performs the Phase 1 login to get a fresh token."""
     print("--- Phase 1: Obtaining Valid JWT Token ---")
     try:
+        # New credentials based on your database setup
         response = requests.post(REST_API_URL, json={"username": TEST_USER, "password": TEST_PASS})
         response.raise_for_status() # Raise exception for 4xx or 5xx status codes
         token = response.json().get('token')
@@ -67,21 +71,21 @@ def get_valid_jwt_token():
         return None
 
 async def main():
-    # 1. Get a valid token from the REST API
+    # 1. Get a valid token from the REST API (Tests DB authentication)
     valid_token = get_valid_jwt_token()
     if not valid_token:
         return
 
-    # 2. Test 1: Successful connection with the valid token
-    await test_websocket_connection(token=valid_token, test_name="TEST 1 (VALID TOKEN)")
+    # 2. Test 1: Successful connection with the valid token (Tests Handshake & E2E Chat)
+    await test_websocket_connection(token=valid_token, test_name="TEST 1 (VALID TOKEN - DB CHECK)")
     
     # Give the backend a second to ensure connection is fully closed
     await asyncio.sleep(1) 
 
-    # 3. Test 2: Rejected connection without any token
+    # 3. Test 2: Rejected connection without any token (Tests Security Guardrail 1)
     await test_websocket_connection(test_name="TEST 2 (NO TOKEN)")
 
-    # 4. Test 3: Rejected connection with a clearly invalid token
+    # 4. Test 3: Rejected connection with a clearly invalid token (Tests Security Guardrail 2)
     await test_websocket_connection(token="INVALID_TOKEN_123", test_name="TEST 3 (INVALID TOKEN)")
 
 
