@@ -1,30 +1,32 @@
 # main.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, status
-from fastapi import WebSocket, WebSocketDisconnect, Query, Depends
-from typing import Annotated 
-import json
-import asyncio
+from fastapi import FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect, Query, Depends
 from sqlalchemy.orm import Session
+import json
+
 from database import engine, Base, get_db
 from models import User
 from auth_handler import create_access_token, decode_access_token
 from state_manager import USER_CONTEXT_STORE
-from ai_client import get_ai_response, initialize_ai_client # Final import for Phase 5
+from ai_client import get_ai_response, initialize_ai_client
 
 
 # --- Initial Setup ---
 Base.metadata.create_all(bind=engine)
 
+
+# --- Schemas ---
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+
 class TokenResponse(BaseModel):
     status: str = "success"
     token: str
+
 
 class ErrorResponse(BaseModel):
     status: str = "error"
@@ -32,112 +34,114 @@ class ErrorResponse(BaseModel):
 
 
 # --- Dependencies ---
-async def get_current_user_from_token(websocket: WebSocket, token: str = Query(...)):
-    username = decode_access_token(token) 
-    
+async def get_current_user_from_token(
+    websocket: WebSocket,
+    token: str = Query(...)
+):
+    username = decode_access_token(token)
     if username is None:
         raise WebSocketDisconnect(
-            code=status.WS_1008_POLICY_VIOLATION, 
-            reason="Token is invalid or expired."
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="Token is invalid or expired"
         )
     return username
 
 
+# --- App ---
 app = FastAPI(title="Secure AI Backend")
 
 
-# --- CORS Configuration ---
+# --- CORS ---
 origins = [
-    "http://localhost:8000", 
+    "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://localhost:3000", 
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
-    allow_credentials=True, 
-    allow_methods=["*"], 
-    allow_headers=["*"], 
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
-# --- NEW: Application Lifespan Event ---
-# This runs the async initializer when the server starts, solving the client error.
+# --- Startup Event ---
 @app.on_event("startup")
-async def startup_event():
-    await initialize_ai_client()
+def startup_event():
+    """
+    Initialize Gemini client ONCE when the app starts.
+    """
+    initialize_ai_client()
 
 
-
-
-# --- REST API Endpoint ---
+# --- REST API ---
 @app.post(
     "/api/v1/auth/login",
-    response_model=TokenResponse, 
-    responses={
-        401: {"model": ErrorResponse, "description": "Authentication Failed"}
-    }
+    response_model=TokenResponse,
+    responses={401: {"model": ErrorResponse}},
 )
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == credentials.username).first()
 
-    if user is None or user.hashed_password != credentials.password: 
+    if user is None or user.hashed_password != credentials.password:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     token = create_access_token(user_id=user.username)
     return TokenResponse(token=token)
-    
 
-# --- WebSocket Endpoint (Final Logic) ---
+
+# --- WebSocket Endpoint ---
 @app.websocket("/api/v1/ai/chat")
 async def websocket_endpoint(
-    websocket: WebSocket, 
-    username: str = Depends(get_current_user_from_token)
+    websocket: WebSocket,
+    username: str = Depends(get_current_user_from_token),
 ):
     await websocket.accept()
-    
+
     if username not in USER_CONTEXT_STORE:
         USER_CONTEXT_STORE[username] = []
-        
-    print(f"User {username} connected. History length: {len(USER_CONTEXT_STORE[username])}")
-    
+
+    print(f"🟢 {username} connected | Context length: {len(USER_CONTEXT_STORE[username])}")
+
     try:
         while True:
             data = await websocket.receive_text()
-            user_message = json.loads(data)
-            question_text = user_message.get("data", "").strip()
+            payload = json.loads(data)
+            question_text = payload.get("data", "").strip()
 
-            # 1. Add user message to context store
+            # Store user message
             USER_CONTEXT_STORE[username].append({
                 "role": "user",
                 "content": question_text
             })
 
-            # 2. Prepare context for API call
-            context_for_api = USER_CONTEXT_STORE[username]
-            
-            raw_ai_response = await get_ai_response(username, context_for_api) # <--- USE SIMPLE AWAIT
-            
-            # 3. Add AI's response to the context store
+            # AI call
+            ai_response = await get_ai_response(
+                username=username,
+                context_history=USER_CONTEXT_STORE[username]
+            )
+
+            # Store AI response
             USER_CONTEXT_STORE[username].append({
                 "role": "ai",
-                "content": raw_ai_response
+                "content": ai_response
             })
-            
-            # 4. Send the response back to the client
+
             await websocket.send_json({
                 "type": "ai_response",
-                "data": raw_ai_response,
+                "data": ai_response,
                 "status": "complete"
             })
-            
+
     except WebSocketDisconnect:
-        print(f"User {username} disconnected. Context retained.")
+        print(f"🔌 {username} disconnected — context retained")
+
     except Exception as e:
-        print(f"An unexpected error occurred for {username}: {e}")
+        print(f"❌ Error for {username}: {e}")
