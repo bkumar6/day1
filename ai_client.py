@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from google.genai import AsyncClient 
+from google.generativeai import GenerativeModel 
 import asyncio # <-- Need this for the async initialization
 
 load_dotenv() 
@@ -18,7 +18,8 @@ async def initialize_ai_client():
     print("Attempting to initialize AI AsyncClient...")
     try:
         # Initialize the ASYNCHRONOUS client
-        client = AsyncClient() 
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        model = genai.GenerativeModel("gemini-1.5-flash") 
         print("AI AsyncClient initialized successfully.")
     except Exception as e:
         print(f"Error initializing AI AsyncClient: {e}")
