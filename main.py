@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, status
 from fastapi import WebSocket, WebSocketDisconnect, Query, Depends
 from jose import jwt, JWTError # Added import for JWT handling
@@ -33,6 +34,26 @@ async def get_current_user_from_token(websocket: WebSocket, token: str = Query(.
 
 
 app = FastAPI(title="Secure AI Backend")
+
+
+# --- CORS Configuration ---
+# 1. Define the origins (URLs) that are allowed to make requests to your API.
+#    Note: Always use specific origins in production, never ["*"]
+origins = [
+    "http://localhost:8000",  # Teammate's local frontend development server
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",  # Common frontend framework ports (if applicable)
+    "http://127.0.0.1:3000",
+    # If your frontend is also deployed: "https://your-frontend-domain.com",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,             # Allows the origins listed above
+    allow_credentials=True,            # Allows cookies and authorization headers
+    allow_methods=["*"],               # Allows all methods (GET, POST, etc.)
+    allow_headers=["*"],               # Allows all headers
+)
 
 # --- Dummy Database/User Setup ---
 # This simulates checking the database. We use a hardcoded user for Phase 1.
