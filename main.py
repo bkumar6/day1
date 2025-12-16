@@ -12,7 +12,7 @@ from database import engine, Base, get_db
 from models import User
 from auth_handler import create_access_token, decode_access_token
 from state_manager import USER_CONTEXT_STORE
-from ai_client import get_ai_response # Final import for Phase 5
+from ai_client import get_ai_response, initialize_ai_client # Final import for Phase 5
 
 
 # --- Initial Setup ---
@@ -61,6 +61,15 @@ app.add_middleware(
     allow_methods=["*"], 
     allow_headers=["*"], 
 )
+
+
+# --- NEW: Application Lifespan Event ---
+# This runs the async initializer when the server starts, solving the client error.
+@app.on_event("startup")
+async def startup_event():
+    await initialize_ai_client()
+
+
 
 
 # --- REST API Endpoint ---
@@ -116,11 +125,7 @@ async def websocket_endpoint(
             # --- PHASE 5 CRITICAL FIX: ASYNCIO.TO_THREAD ---
             # Call the synchronous get_ai_response in a separate thread to prevent
             # blocking the main event loop and resolve the timeout warning.
-            raw_ai_response = await asyncio.to_thread(
-                get_ai_response, 
-                username, 
-                context_for_api
-            )
+            raw_ai_response = await get_ai_response(username, context_for_api) # <--- USE SIMPLE AWAIT
             
             # 3. Add AI's response to the context store
             USER_CONTEXT_STORE[username].append({
