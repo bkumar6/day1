@@ -1,16 +1,14 @@
-# auth_handler.py
-
 import time
 from jose import jwt, JWTError
 from fastapi import status, HTTPException
 
 # --- JWT Configuration ---
-# In a real app, load this from environment variables (e.g., .env file)
+# REPLACE THIS WITH A REAL SECRET KEY IN PRODUCTION!
 SECRET_KEY = "YOUR_SUPER_SECRET_KEY_REPLACE_ME" 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 # Token validity period
 
-# --- Function 1: Create JWT Token ---
+# --- Function 1: Create JWT Token (Used in REST /login) ---
 def create_access_token(user_id: str) -> str:
     """Generates a JWT token for the authenticated user."""
     

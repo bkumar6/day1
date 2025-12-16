@@ -9,7 +9,7 @@ import asyncio
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import User
-from auth_handler import create_access_token
+from auth_handler import create_access_token, decode_access_token
 
 # This command checks all models that inherit from Base and creates 
 # the corresponding tables in the SQLite file if they don't exist.
@@ -48,7 +48,7 @@ async def get_current_user_from_token(websocket: WebSocket, token: str = Query(.
     return username
 
 
-    
+
 app = FastAPI(title="Secure AI Backend")
 
 
