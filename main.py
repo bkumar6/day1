@@ -28,10 +28,10 @@ async def get_current_user_from_token(websocket: WebSocket, token: str = Query(.
     # Placeholder for your actual verification logic
     # In Phase 2, this function should raise an exception if the token is invalid
     # For now, we'll just return the username for use in the chat loop
-    if token == "INVALID_TOKEN_123":
-        raise WebSocketDisconnect(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid authentication token")
+    if token:
+        return "testuser"
     # Simulate extraction of username from a valid token
-    return "testuser"
+    raise WebSocketDisconnect(code=1008)  # Policy Violation
 
 
 app = FastAPI(title="Secure AI Backend")
