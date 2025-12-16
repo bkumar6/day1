@@ -6,6 +6,14 @@ from jose import jwt, JWTError
 from typing import Optional, Annotated # <-- ADDED ANNOTATED HERE
 import json
 import asyncio
+from sqlalchemy.orm import Session
+from database import engine, Base, get_db
+from models import User
+from auth_handler import create_access_token
+
+# This command checks all models that inherit from Base and creates 
+# the corresponding tables in the SQLite file if they don't exist.
+Base.metadata.create_all(bind=engine)
 
 # 1. Contract for the incoming login request
 class LoginRequest(BaseModel):
@@ -25,27 +33,22 @@ class ErrorResponse(BaseModel):
 
 # This function is run during the connection handshake
 async def get_current_user_from_token(websocket: WebSocket, token: str = Query(...)):
+    # 1. Use the REAL decoder to check the token
+    username = decode_access_token(token) 
     
-    # CASE 1: MOCK/VALID TOKEN (Success Path - Must return)
-    if token.startswith("eyJ"): 
-        # In a real app, this is where you verify the signature and return the user
-        return "testuser" 
+    # 2. Check the result
+    if username is None:
+        # If decode_access_token returns None, the token is invalid or expired.
+        raise WebSocketDisconnect(
+            code=status.WS_1008_POLICY_VIOLATION, 
+            reason="Token is invalid or expired."
+        )
     
-    # CASE 2: INVALID TOKEN (The one causing the traceback)
-    if token == "INVALID_TOKEN_123":
-        # Raise the disconnect. This is the correct behavior.
-        # If this still generates the full traceback, it's an ASGI/Starlette version bug, 
-        # but the BEHAVIOR (rejection) is correct.
-        raise WebSocketDisconnect(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token provided.")
+    # 3. SUCCESS PATH: Return the authenticated username
+    return username
 
-    # CASE 3: NO TOKEN (Handled by FastAPI dependency check, but for safety...)
-    if not token:
-        # Should not be reached if Query(...) is used, but for clarity
-        raise WebSocketDisconnect(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication token missing.")
 
-    # Fallback for unexpected token values
-    raise WebSocketDisconnect(code=status.WS_1008_POLICY_VIOLATION, reason="Token verification failed.")
-
+    
 app = FastAPI(title="Secure AI Backend")
 
 
@@ -81,21 +84,22 @@ DUMMY_JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1
         401: {"model": ErrorResponse, "description": "Authentication Failed"}
     }
 )
-async def login(credentials: LoginRequest):
-    """
-    Handles user login. Verifies credentials and issues a token.
-    (Currently uses dummy verification and issues a mock token).
-    """
-    if credentials.username == HARDCODED_USERNAME and credentials.password == HARDCODED_PASSWORD:
-        # SUCCESS: Return the agreed-upon dummy token
-        return TokenResponse(token=DUMMY_JWT_TOKEN)
-    else:
-        # FAILURE: Raise an HTTP exception (401 Unauthorized)
+async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    # 1. Query the database for the user
+    user = db.query(User).filter(User.username == credentials.username).first()
+
+    # 2. Verify the user and password
+    if user is None or user.hashed_password != credentials.password: # NOTE: Use secure hashing in production!
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # 3. If valid, generate and return the JWT
+    token = create_access_token(user_id=user.username)
+    return TokenResponse(token=token)
+    
 
 # --- JWT Configuration (Placeholder for now) ---
 # In a real app, use an environment variable for a complex secret
