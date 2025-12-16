@@ -122,9 +122,6 @@ async def websocket_endpoint(
             # 2. Prepare context for API call
             context_for_api = USER_CONTEXT_STORE[username]
             
-            # --- PHASE 5 CRITICAL FIX: ASYNCIO.TO_THREAD ---
-            # Call the synchronous get_ai_response in a separate thread to prevent
-            # blocking the main event loop and resolve the timeout warning.
             raw_ai_response = await get_ai_response(username, context_for_api) # <--- USE SIMPLE AWAIT
             
             # 3. Add AI's response to the context store

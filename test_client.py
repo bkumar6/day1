@@ -1,4 +1,3 @@
-# test_client.py
 import requests
 import json
 

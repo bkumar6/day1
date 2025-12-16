@@ -4,7 +4,7 @@ import requests
 import json
 import time
 
-# --- CONFIGURATION (Match your backend settings) ---
+
 # NOTE: Use HTTPS for Render deployments!
 REST_API_URL = "https://day1-backend-test.onrender.com/api/v1/auth/login" # Updated to HTTPS
 WS_URI_BASE = "wss://day1-backend-test.onrender.com/api/v1/ai/chat" 

@@ -1,4 +1,3 @@
-# ai_client.py (Finalized Version)
 
 import os
 from dotenv import load_dotenv
@@ -25,7 +24,6 @@ async def initialize_ai_client():
         print(f"Error initializing AI AsyncClient: {e}")
         client = None
 
-# This function must now be async (same as before)
 async def get_ai_response(username: str, context_history: list[dict]) -> str:
     """
     Asynchronous function to call the external AI API using the full context.
@@ -33,7 +31,6 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
     if not client:
         return "ERROR: AI service not available. Initialization failed."
 
-    # 1. Format Context (same as before)
     formatted_content = []
     for message in context_history:
         role = 'model' if message['role'] == 'ai' else 'user'
@@ -42,7 +39,6 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
             parts=[types.Part.from_text(message['content'])]
         ))
 
-    # 2. Call the API with the full conversation history
     try:
         # This MUST be awaited.
         response = await client.models.generate_content(
