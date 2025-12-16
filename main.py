@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, status
 from fastapi import WebSocket, WebSocketDisconnect, Query, Depends
 from jose import jwt, JWTError
-from typing import Optional, Annotated # <-- ADDED ANNOTATED HERE
+from typing import Optional, Annotated 
 import json
 import asyncio
 from sqlalchemy.orm import Session
@@ -11,8 +11,7 @@ from database import engine, Base, get_db
 from models import User
 from auth_handler import create_access_token, decode_access_token
 from state_manager import USER_CONTEXT_STORE
-
-
+from ai_client import get_ai_response # <-- IMPORT FOR PHASE 5
 
 # This command checks all models that inherit from Base and creates 
 # the corresponding tables in the SQLite file if they don't exist.
@@ -34,7 +33,7 @@ class ErrorResponse(BaseModel):
     message: str
 
 
-# This function is run during the connection handshake
+# This function is run during the connection handshake (Phase 3 Dependency)
 async def get_current_user_from_token(websocket: WebSocket, token: str = Query(...)):
     # 1. Use the REAL decoder to check the token
     username = decode_access_token(token) 
@@ -51,48 +50,39 @@ async def get_current_user_from_token(websocket: WebSocket, token: str = Query(.
     return username
 
 
-
 app = FastAPI(title="Secure AI Backend")
 
 
 # --- CORS Configuration ---
-# 1. Define the origins (URLs) that are allowed to make requests to your API.
-#    Note: Always use specific origins in production, never ["*"]
 origins = [
-    "http://localhost:8000",  # Teammate's local frontend development server
+    "http://localhost:8000", 
     "http://127.0.0.1:8000",
-    "http://localhost:3000",  # Common frontend framework ports (if applicable)
+    "http://localhost:3000", 
     "http://127.0.0.1:3000",
-    # If your frontend is also deployed: "https://your-frontend-domain.com",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,             # Allows the origins listed above
-    allow_credentials=True,            # Allows cookies and authorization headers
-    allow_methods=["*"],               # Allows all methods (GET, POST, etc.)
-    allow_headers=["*"],               # Allows all headers
+    allow_origins=origins, 
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"], 
 )
 
-# --- Dummy Database/User Setup ---
-# This simulates checking the database. We use a hardcoded user for Phase 1.
-HARDCODED_USERNAME = "testuser"
-HARDCODED_PASSWORD = "password123"
-DUMMY_JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwiaXNzIjoiYmFja2VuZCIsImV4cCI6MjAwMDAwMDAwMH0.s_MOCK_TOKEN_FOR_FRONTEND_TESTING_12345"
 
 @app.post(
     "/api/v1/auth/login",
-    response_model=TokenResponse, # Use the success contract for documentation
+    response_model=TokenResponse, 
     responses={
         401: {"model": ErrorResponse, "description": "Authentication Failed"}
     }
 )
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
-    # 1. Query the database for the user
+    # 1. Query the database for the user (Phase 4 Authentication)
     user = db.query(User).filter(User.username == credentials.username).first()
 
     # 2. Verify the user and password
-    if user is None or user.hashed_password != credentials.password: # NOTE: Use secure hashing in production!
+    if user is None or user.hashed_password != credentials.password: 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -103,35 +93,6 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token(user_id=user.username)
     return TokenResponse(token=token)
     
-
-# --- JWT Configuration (Placeholder for now) ---
-# In a real app, use an environment variable for a complex secret
-SECRET_KEY = "SUPER_SECRET_KEY_FOR_JWT_SIGNING" 
-ALGORITHM = "HS256"
-
-def verify_jwt_and_get_username(token: str) -> str:
-    """
-    Simulates JWT verification using a real library structure.
-    In a real app, you'd decode and check token validity and expiration.
-    """
-    if token == DUMMY_JWT_TOKEN:
-        # Since our DUMMY_JWT_TOKEN is hardcoded, we mock the result of decoding
-        return HARDCODED_USERNAME
-    
-    # In a real scenario, you'd use the library to check the token signature:
-    try:
-        # payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        # username: str = payload.get("username")
-        # if username is None:
-        #     raise JWTError
-        # return username
-        pass # Using the simple check above for the dummy token
-    except JWTError:
-        # Raised if the signature is invalid, token is expired, etc.
-        raise ValueError("Invalid authentication token")
-    
-    # Fallback for any other invalid token not matching the dummy
-    raise ValueError("Invalid authentication token")
 
 @app.websocket("/api/v1/ai/chat")
 async def websocket_endpoint(
@@ -158,31 +119,31 @@ async def websocket_endpoint(
                 "content": question_text
             })
 
-            # 3. Simulate a context-aware response
-            current_history = USER_CONTEXT_STORE[username]
-            history_length = len(current_history)
+            # --- PHASE 5: EXTERNAL AI CALL ---
             
-            # Look at the history to give a contextual response
-            if history_length > 2: # At least one user and one AI message prior
-                # This response proves the AI remembers past interactions
-                response = f"I remember {history_length // 2} prior turns in our chat. You just asked: '{question_text}'."
-            else:
-                response = f"Hello {username}, this is the start of our conversation. I received: '{question_text}'."
+            # 3. Get the full history for context
+            context_for_api = USER_CONTEXT_STORE[username]
             
+            # CALL THE REAL AI FUNCTION (This replaces all placeholder logic)
+            # This function handles the formatting and API request
+            raw_ai_response = await asyncio.to_thread(get_ai_response, username, context_for_api)
+            
+            # --- END PHASE 5 ---
+
             # 4. Add AI's response to the context store
             USER_CONTEXT_STORE[username].append({
                 "role": "ai",
-                "content": response
+                "content": raw_ai_response
             })
             
             # 5. Send the response back to the client
             await websocket.send_json({
                 "type": "ai_response",
-                "data": response,
+                "data": raw_ai_response,
                 "status": "complete"
             })
             
     except WebSocketDisconnect:
-        print(f"User {username} disconnected.")
+        print(f"User {username} disconnected. Context retained.")
     except Exception as e:
         print(f"An unexpected error occurred for {username}: {e}")
