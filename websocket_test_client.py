@@ -6,7 +6,7 @@ import time
 
 # --- CONFIGURATION (Match your backend settings) ---
 REST_API_URL = "http://day1-backend-test.onrender.com/api/v1/auth/login" # Replace with your Render/VPS URL if deployed
-WS_URI_BASE = "ws://day1-backend-test.onrender.com/api/v1/ai/chat" # Replace with your Render/VPS URL if deployed
+WS_URI_BASE = "wss://day1-backend-test.onrender.com/api/v1/ai/chat" # Replace with your Render/VPS URL if deployed
 TEST_USER = "testuser"
 TEST_PASS = "password123"
 
