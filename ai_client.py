@@ -5,40 +5,35 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-# Load environment variables from .env file
+# Load environment variables from .env file (for local development)
 load_dotenv() 
 
-# Initialize the Gemini Client using the environment variable
-# The client automatically looks for the GEMINI_API_KEY environment variable.
+# --- AI CLIENT INITIALIZATION ---
+# The client will automatically use the GEMINI_API_KEY environment variable.
 try:
+    # Ensure the client is initialized when the script starts
     client = genai.Client()
     # Define the model to use
     MODEL_NAME = "gemini-2.5-flash"
     print("AI Client initialized successfully.")
 except Exception as e:
+    # This error should now be fixed on Render, but we keep the handler
     print(f"Error initializing AI client: {e}")
     client = None
     MODEL_NAME = None
 
 def get_ai_response(username: str, context_history: list[dict]) -> str:
     """
-    Takes the user's history and calls the external AI API.
-    
-    Args:
-        username: The user making the request.
-        context_history: A list of dicts representing the chat history.
-    
-    Returns:
-        The text response from the AI.
+    Synchronous function that calls the external AI API using the full context.
+    This function runs in a separate thread via asyncio.to_thread.
     """
     if not client:
         return "ERROR: AI service not available due to initialization failure."
 
     # 1. Format Context for the Gemini API
-    # The API expects roles 'user' and 'model' (not 'ai') and a specific content format.
     formatted_content = []
     for message in context_history:
-        # Map your internal roles to the required API roles
+        # Map your internal roles ('user', 'ai') to the required API roles ('user', 'model')
         role = 'model' if message['role'] == 'ai' else 'user'
         
         formatted_content.append(types.Content(
@@ -48,6 +43,7 @@ def get_ai_response(username: str, context_history: list[dict]) -> str:
 
     # 2. Call the API with the full conversation history
     try:
+        # NOTE: This is a synchronous (blocking) call.
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=formatted_content,
@@ -58,4 +54,5 @@ def get_ai_response(username: str, context_history: list[dict]) -> str:
         
     except Exception as e:
         print(f"Error calling AI API for {username}: {e}")
-        return "Internal AI processing error."
+        # Return a simple error to the user if the API call itself fails
+        return "Internal AI processing error (API call failed)."
