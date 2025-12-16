@@ -2,9 +2,10 @@ from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, status
 from fastapi import WebSocket, WebSocketDisconnect, Query, Depends
-from jose import jwt, JWTError # Added import for JWT handling
-from typing import Optional
+from jose import jwt, JWTError
+from typing import Optional, Annotated # <-- ADDED ANNOTATED HERE
 import json
+import asyncio
 
 # 1. Contract for the incoming login request
 class LoginRequest(BaseModel):
