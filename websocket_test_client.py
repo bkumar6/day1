@@ -12,50 +12,54 @@ TEST_USER = "testuser"
 TEST_PASS = "password123"
 
 async def test_websocket_connection(token: str = None, test_name: str = "Test"):
-    """Attempts to establish a WebSocket connection and exchange a message."""
+    """Attempts to establish a WebSocket connection and run multi-message test."""
     
     ws_uri = WS_URI_BASE
     if token:
-        # Build the URI with the JWT for authentication
         ws_uri = f"{WS_URI_BASE}?token={token}"
         print(f"\n--- {test_name}: Connecting with Token ({len(token)} chars) ---")
     else:
         print(f"\n--- {test_name}: Connecting WITHOUT Token ---")
 
     try:
-        # 1. Establish the connection (the handshake)
         async with websockets.connect(ws_uri) as websocket:
             print("🟢 SUCCESS: Connection established!")
             
-            # 2. Test sending and receiving a message (Simple Q&A)
-            question = "Hello AI, what is your name?"
-            print(f"> Sending question: '{question}'")
+            # --- MULTI-MESSAGE CONTEXT TEST ---
             
-            # Use the agreed-upon message contract (Phase 2 schema)
-            await websocket.send(json.dumps({
-                "type": "user_message", 
-                "data": question
-            }))
-            
-            # 3. Wait for the response
-            # Use asyncio.wait_for to prevent blocking indefinitely
-            response_json = await asyncio.wait_for(websocket.recv(), timeout=5)
-            response = json.loads(response_json)
-            
-            # Print the entire response data
-            print(f"<- Received AI response (Type: {response.get('type')}): {response.get('data')}")
+            test_messages = [
+                "What is my name?",            # Message 1
+                "Tell me about FastAPI.",      # Message 2
+                "What was my first question?"  # Message 3 (Should show memory)
+            ]
+
+            for i, question in enumerate(test_messages, 1):
+                # 1. Send Message
+                print(f"[{i}/{len(test_messages)}] > Sending: '{question}'")
+                
+                await websocket.send(json.dumps({
+                    "type": "user_message", 
+                    "data": question
+                }))
+                
+                # 2. Receive Response
+                response_json = await asyncio.wait_for(websocket.recv(), timeout=5)
+                response = json.loads(response_json)
+                
+                print(f"[{i}/{len(test_messages)}] <- Received: {response.get('data')}")
+                
+            # --- END MULTI-MESSAGE CONTEXT TEST ---
             
     except websockets.exceptions.InvalidURI as e:
         print(f"❌ FAILURE: Invalid URI. Check configuration. Error: {e}")
     except websockets.exceptions.ConnectionClosed as e:
-        # This is the expected result for a rejected connection (security test)
-        print(f"❌ FAILURE: Connection closed by server. This is expected if the token was invalid/missing.")
-        print(f"Error details: Code {e.code}, Reason: {e.reason}")
+        print(f"❌ FAILURE: Connection closed by server. Error details: Code {e.code}, Reason: {e.reason}")
     except asyncio.TimeoutError:
-        print("🟡 WARNING: Connection established, but timed out waiting for AI response. (Check backend processing)")
+        print("🟡 WARNING: Connection established, but timed out waiting for AI response.")
     except Exception as e:
         print(f"An unexpected error occurred: {type(e).__name__}: {e}")
 
+        
 def get_valid_jwt_token():
     """Performs the Phase 1 login to get a fresh token."""
     print("--- Phase 1: Obtaining Valid JWT Token ---")

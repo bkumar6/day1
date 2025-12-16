@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 from models import User
 from auth_handler import create_access_token, decode_access_token
+from state_manager import USER_CONTEXT_STORE
+
+
 
 # This command checks all models that inherit from Base and creates 
 # the corresponding tables in the SQLite file if they don't exist.
@@ -131,45 +134,48 @@ def verify_jwt_and_get_username(token: str) -> str:
     raise ValueError("Invalid authentication token")
 
 @app.websocket("/api/v1/ai/chat")
-async def websocket_endpoint(websocket: WebSocket,
-    # Inject the username after the JWT is verified by the dependency
-    username: Annotated[str, Depends(get_current_user_from_token)]
+async def websocket_endpoint(
+    websocket: WebSocket, 
+    username: str = Depends(get_current_user_from_token)
 ):
-    # If the dependency (get_current_user_from_token) did not raise an exception,
-    # the connection is secure, and we accept it.
     await websocket.accept()
-
-    print(f"User {username} connected and authenticated. Starting chat loop.")
-    # 
-
+    
+    # 1. Initialize context for the user if it doesn't exist
+    if username not in USER_CONTEXT_STORE:
+        USER_CONTEXT_STORE[username] = []
+        
+    print(f"User {username} connected. History length: {len(USER_CONTEXT_STORE[username])}")
+    
     try:
         while True:
-            # 1. RECEIVE: Wait for the client to send a message
-            # Use receive_text() since the client sends a JSON string
             data = await websocket.receive_text()
+            user_message = json.loads(data)
+            question_text = user_message.get("data", "").strip()
+
+            # 2. Add the new user message to the context store
+            USER_CONTEXT_STORE[username].append({
+                "role": "user",
+                "content": question_text
+            })
+
+            # 3. Simulate a context-aware response
+            current_history = USER_CONTEXT_STORE[username]
+            history_length = len(current_history)
             
-            # Parse the agreed-upon inbound JSON contract
-            try:
-                user_message = json.loads(data)
-                question_text = user_message.get("data", "").strip()
-                print(f"[{username}] received: {question_text}")
-
-            except json.JSONDecodeError:
-                print("Received invalid JSON format. Skipping.")
-                continue
-
-            # 2. PROCESS (Phase 3 Simulation: Replace this with real AI later)
-            if not question_text:
-                response = "Please type a question."
-            elif "hello" in question_text.lower() or "hi" in question_text.lower():
-                response = f"Hello {username}! I am your secure AI assistant. How can I help you today?"
+            # Look at the history to give a contextual response
+            if history_length > 2: # At least one user and one AI message prior
+                # This response proves the AI remembers past interactions
+                response = f"I remember {history_length // 2} prior turns in our chat. You just asked: '{question_text}'."
             else:
-                # Simulate a delayed response to mimic AI processing time
-                await asyncio.sleep(0.5) 
-                response = f"I received your query: '{question_text[:50]}...'. My full AI response is a placeholder for Phase 3 testing."
+                response = f"Hello {username}, this is the start of our conversation. I received: '{question_text}'."
             
-            # 3. SEND: Format the response into the outbound JSON contract and send
-            # Use send_json() for cleaner, structured data transmission
+            # 4. Add AI's response to the context store
+            USER_CONTEXT_STORE[username].append({
+                "role": "ai",
+                "content": response
+            })
+            
+            # 5. Send the response back to the client
             await websocket.send_json({
                 "type": "ai_response",
                 "data": response,
@@ -177,8 +183,6 @@ async def websocket_endpoint(websocket: WebSocket,
             })
             
     except WebSocketDisconnect:
-        # This handles when the frontend closes the connection gracefully
         print(f"User {username} disconnected.")
     except Exception as e:
-        # Catch unexpected errors to prevent the server from crashing
-        print(f"An unexpected error occurred in chat loop for {username}: {e}")
+        print(f"An unexpected error occurred for {username}: {e}")
