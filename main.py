@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, status
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, Query, Depends
 from jose import jwt, JWTError # Added import for JWT handling
 from typing import Optional
 import json
@@ -20,6 +20,16 @@ class ErrorResponse(BaseModel):
     status: str = "error"
     message: str
 
+
+# This function is run during the connection handshake
+async def get_current_user_from_token(websocket: WebSocket, token: str = Query(...)):
+    # Placeholder for your actual verification logic
+    # In Phase 2, this function should raise an exception if the token is invalid
+    # For now, we'll just return the username for use in the chat loop
+    if token == "INVALID_TOKEN_123":
+        raise WebSocketDisconnect(code=status.WS_1008_POLICY_VIOLATION, reason="Invalid authentication token")
+    # Simulate extraction of username from a valid token
+    return "testuser"
 
 
 app = FastAPI(title="Secure AI Backend")
@@ -83,48 +93,54 @@ def verify_jwt_and_get_username(token: str) -> str:
     raise ValueError("Invalid authentication token")
 
 @app.websocket("/api/v1/ai/chat")
-async def websocket_endpoint(websocket: WebSocket, token: str = None):
-    # Connection Acceptance and Auth Check (Handshake)
-    if not token:
-        # This will fail the handshake before accepting the connection
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication token missing")
-        return
+async def websocket_endpoint(websocket: WebSocket,
+    # Inject the username after the JWT is verified by the dependency
+    username: Annotated[str, Depends(get_current_user_from_token)]
+):
+    # If the dependency (get_current_user_from_token) did not raise an exception,
+    # the connection is secure, and we accept it.
+    await websocket.accept()
 
-    try:
-        # Verify the token using the function from Step 2
-        username = verify_jwt_and_get_username(token)
-        print(f"User {username} authenticated. Establishing connection.")
-        await websocket.accept() # CRITICAL: Accept the connection only if authenticated
-        
-    except ValueError as e:
-        # Close connection with a policy violation code if auth fails
-        print(f"Authentication failed: {e}")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason=str(e))
-        return
+    print(f"User {username} connected and authenticated. Starting chat loop.")
+    # 
 
-    # Communication Loop
     try:
         while True:
-            # Server waits to receive a message from the client
+            # 1. RECEIVE: Wait for the client to send a message
+            # Use receive_text() since the client sends a JSON string
             data = await websocket.receive_text()
             
-            # 1. Parse the incoming JSON message (according to the contract)
-            message = json.loads(data)
-            print(f"[{username}] received: {message.get('data')}")
+            # Parse the agreed-upon inbound JSON contract
+            try:
+                user_message = json.loads(data)
+                question_text = user_message.get("data", "").strip()
+                print(f"[{username}] received: {question_text}")
+
+            except json.JSONDecodeError:
+                print("Received invalid JSON format. Skipping.")
+                continue
+
+            # 2. PROCESS (Phase 3 Simulation: Replace this with real AI later)
+            if not question_text:
+                response = "Please type a question."
+            elif "hello" in question_text.lower() or "hi" in question_text.lower():
+                response = f"Hello {username}! I am your secure AI assistant. How can I help you today?"
+            else:
+                # Simulate a delayed response to mimic AI processing time
+                await asyncio.sleep(0.5) 
+                response = f"I received your query: '{question_text[:50]}...'. My full AI response is a placeholder for Phase 3 testing."
             
-            # 2. Process the AI Query (DUMMY RESPONSE)
-            user_question = message.get("data", "No question")
-            ai_response = f"Hello {username}, you asked: '{user_question}'. This is the AI's dummy answer."
-            
-            # 3. Send the response back (according to the contract)
-            response_json = json.dumps({
+            # 3. SEND: Format the response into the outbound JSON contract and send
+            # Use send_json() for cleaner, structured data transmission
+            await websocket.send_json({
                 "type": "ai_response",
-                "data": ai_response,
+                "data": response,
                 "status": "complete"
             })
-            await websocket.send_text(response_json)
-
+            
     except WebSocketDisconnect:
+        # This handles when the frontend closes the connection gracefully
         print(f"User {username} disconnected.")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        # Catch unexpected errors to prevent the server from crashing
+        print(f"An unexpected error occurred in chat loop for {username}: {e}")
