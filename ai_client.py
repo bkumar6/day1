@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Global variable for compatibility with main.py
 client = None 
 
 async def initialize_ai_client():
@@ -17,17 +16,16 @@ async def initialize_ai_client():
 async def get_ai_response(username: str, context_history: list[dict]) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return "ERROR: Groq API Key missing in environment."
+        return "ERROR: Groq API Key missing."
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     
-    # Map context to Groq/OpenAI format: assistant instead of ai
+    # Map context to Groq/OpenAI format
     messages = []
     for m in context_history:
         role = "assistant" if m["role"] == "ai" else "user"
         messages.append({"role": role, "content": m["content"]})
 
-    # Using Llama 3.3 70B - it's free, smart, and extremely fast
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": messages,
@@ -40,15 +38,9 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
     }
 
     try:
-        # Run the network request in a separate thread to keep WebSockets alive
         response = await asyncio.to_thread(
-            requests.post, 
-            url, 
-            json=payload, 
-            headers=headers, 
-            timeout=15
+            requests.post, url, json=payload, headers=headers, timeout=15
         )
-        
         data = response.json()
         
         if response.status_code == 200:
@@ -56,7 +48,6 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
         else:
             error_msg = data.get("error", {}).get("message", "Unknown Groq Error")
             return f"AI Error: {error_msg}"
-
     except Exception as e:
         print(f"❌ Groq API Failure: {str(e)}")
-        return "AI Error: Connection to Groq failed."
+        return "AI Error: Connection failed."
