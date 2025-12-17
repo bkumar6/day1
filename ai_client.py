@@ -1,50 +1,54 @@
 # ai_client.py
 import os
+import requests
 import asyncio
 from dotenv import load_dotenv
-from google import genai
 
 load_dotenv()
 
-client = None
-# We go back to the modern model name, but fix the client routing
-MODEL_NAME = "gemini-1.5-flash" 
+# We keep these for the main.py compatibility
+client = None 
 
 async def initialize_ai_client():
-    global client
-    print("Attempting to initialize Gemini AI Client...")
-    try:
-        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            print("❌ Error: No API Key found.")
-            return
-            
-        # FORCE the client to use the Google AI Studio backend, not Vertex AI
-        # This is done by passing the api_key directly to the Client 
-        # and ensuring it's not looking for Google Cloud credentials
-        client = genai.Client(api_key=api_key, http_options={'api_version': 'v1'})
-        print("✅ Gemini AI Client initialized on v1 API.")
-    except Exception as e:
-        print(f"❌ Initialization Error: {e}")
-        client = None
+    """No complex initialization needed for REST calls."""
+    print("✅ AI REST Client ready.")
+    return True
 
 async def get_ai_response(username: str, context_history: list[dict]) -> str:
-    if not client:
-        return "ERROR: AI service not available."
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return "ERROR: API Key missing."
 
-    user_query = context_history[-1]["content"] if context_history else "Hello"
+    # Use the official v1 endpoint URL
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    # Get the last message from user
+    user_text = context_history[-1]["content"] if context_history else "Hello"
+
+    # Standard Google AI REST payload
+    payload = {
+        "contents": [{
+            "parts": [{"text": user_text}]
+        }]
+    }
 
     try:
-        # We run this in a thread to prevent blocking
+        # Run the blocking request in a thread to keep the WebSocket alive
         response = await asyncio.to_thread(
-            client.models.generate_content,
-            model=MODEL_NAME,
-            contents=user_query
+            requests.post, 
+            url, 
+            json=payload, 
+            timeout=10
         )
         
-        return response.text
+        result = response.json()
         
+        # Dig the text out of the response
+        if "candidates" in result:
+            return result["candidates"][0]["content"]["parts"][0]["text"]
+        else:
+            return f"AI Error: {result.get('error', {}).get('message', 'Unknown Error')}"
+
     except Exception as e:
-        # If it still fails, we'll see the exact reason
-        print(f"❌ API Failure: {str(e)}")
+        print(f"❌ REST API Failure: {str(e)}")
         return f"AI Error: {str(e)}"
