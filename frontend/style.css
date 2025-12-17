@@ -1,0 +1,147 @@
+/* Base reset */
+* {
+  box-sizing: border-box;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(135deg, #eef2f7, #e3e8ef);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+/* Card layout */
+.card {
+  width: 440px;
+  background: #ffffff;
+  padding: 26px;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Headings */
+h2 {
+  margin: 0 0 16px 0;
+  color: #2c3e50;
+}
+
+/* Labels */
+label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #555;
+}
+
+/* Inputs */
+input {
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.15);
+}
+
+/* Buttons */
+button {
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  background: #4a90e2;
+  color: #ffffff;
+}
+
+button:hover {
+  background: #3a7bc8;
+}
+
+button:disabled {
+  background: #a0b9d8;
+  cursor: not-allowed;
+}
+
+/* Secondary button */
+button.secondary {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ccc;
+}
+
+button.secondary:hover {
+  background: #e4e4e4;
+}
+
+/* Error */
+.error {
+  color: #d9534f;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* Chat header */
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* Log container */
+.log-container {
+  height: 300px;
+  border: 1px solid #dcdcdc;
+  border-radius: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  background: #f9fafb;
+  margin-bottom: 12px;
+}
+
+/* Log entry */
+.log {
+  background: #ffffff;
+  border: 1px solid #e1e1e1;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.log b {
+  color: #2c3e50;
+}
+
+.log hr {
+  border: none;
+  border-top: 1px solid #eee;
+  margin-top: 8px;
+}
+
+/* Input row */
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.input-row input {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.input-row button {
+  width: 90px;
+}
