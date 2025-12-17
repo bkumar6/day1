@@ -9,7 +9,7 @@ load_dotenv()
 
 client = None
 # For version 0.6.0, try using 'gemini-1.5-flash' or 'models/gemini-1.5-flash'
-MODEL_NAME = "gemini-1.5-flash" 
+MODEL_NAME = "models/gemini-1.5-flash" 
 
 async def initialize_ai_client():
     global client
