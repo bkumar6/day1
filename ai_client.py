@@ -8,14 +8,14 @@ from google.genai import types
 load_dotenv()
 
 client = None
-# For version 0.6.0, try using 'gemini-1.5-flash' or 'models/gemini-1.5-flash'
-MODEL_NAME = "models/gemini-1.5-flash" 
+# CHANGE THIS LINE: This specific ID is the most stable for v1beta calls
+MODEL_NAME = "gemini-1.5-flash" 
 
 async def initialize_ai_client():
     global client
     print("Attempting to initialize AI Client...")
     try:
-        # Check for both possible naming conventions
+        # Prioritize GEMINI_API_KEY from Render Environment Variables
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         
         if not api_key:
@@ -30,20 +30,25 @@ async def initialize_ai_client():
 
 async def get_ai_response(username: str, context_history: list[dict]) -> str:
     if not client:
-        return "ERROR: AI service not available. Initialization failed."
+        return "ERROR: AI service not available."
 
-    # Simplify contents for 0.6.0 compatibility
+    # Using a flat string for the most basic compatibility with v0.6.0
     user_query = context_history[-1]["content"] if context_history else ""
 
     try:
-        # Execute the call in a thread to remain non-blocking
+        # Running in a thread to keep the WebSocket responsive
+        # We pass the model name exactly as requested by the v1beta endpoint
         response = await asyncio.to_thread(
             client.models.generate_content,
             model=MODEL_NAME,
             contents=user_query
         )
-        return response.text
+        
+        if hasattr(response, 'text'):
+            return response.text
+        return str(response)
+        
     except Exception as e:
-        # THIS PRINT IS CRITICAL: Check your Render logs for this output!
-        print(f"❌ Gemini API Call Failed for {username}: {str(e)}")
+        print(f"❌ Gemini API Call Failed: {str(e)}")
+        # If gemini-1.5-flash fails again, we try the fallback 'gemini-pro'
         return f"AI Error: {str(e)}"
