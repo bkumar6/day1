@@ -4,14 +4,14 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from google.genai import AsyncClient 
+from google.genai import Client, AsyncClient 
 import asyncio 
 
 load_dotenv() 
 
 # Global variables for the client
 client = None
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.0-flash"
 
 # --- ASYNC INITIALIZATION FUNCTION ---
 async def initialize_ai_client():
