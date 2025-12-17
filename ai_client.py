@@ -9,7 +9,7 @@ load_dotenv()
 client = None 
 
 async def initialize_ai_client():
-    """Simple confirmation for the REST client."""
+    """Confirms the REST client is ready."""
     print("✅ AI REST Client ready.")
     return True
 
@@ -18,8 +18,9 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
     if not api_key:
         return "ERROR: API Key missing."
 
-    # Use v1beta and the -latest suffix for maximum compatibility
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
+    # UPDATED MODEL: Use gemini-2.0-flash for current compatibility
+    model_id = "gemini-2.0-flash" 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
     
     user_text = context_history[-1]["content"] if context_history else "Hello"
 
@@ -39,12 +40,13 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
         
         result = response.json()
         
-        # Robust parsing of the Gemini REST response
         if response.status_code == 200:
+            # Successfully extracting response text
             return result["candidates"][0]["content"]["parts"][0]["text"]
         else:
-            # This will show the actual error message from Google in your test client
-            return f"AI Error: {result.get('error', {}).get('message', 'Unknown Error')}"
+            # Returning the actual error from Google to your test client
+            error_message = result.get('error', {}).get('message', 'Unknown Error')
+            return f"AI Error: {error_message}"
 
     except Exception as e:
         print(f"❌ REST API Failure: {str(e)}")
