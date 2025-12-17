@@ -19,7 +19,7 @@ async def get_ai_response(username: str, context_history: list[dict]) -> str:
         return "ERROR: API Key missing."
 
     # UPDATED MODEL: Use gemini-2.0-flash for current compatibility
-    model_id = "gemini-2.0-flash" 
+    model_id = "gemini-1.0-pro" 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={api_key}"
     
     user_text = context_history[-1]["content"] if context_history else "Hello"
