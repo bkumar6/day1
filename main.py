@@ -12,18 +12,28 @@ from auth_handler import create_access_token, decode_access_token
 from state_manager import USER_CONTEXT_STORE
 from ai_client import get_ai_response, initialize_ai_client
 
+# --- Initial Setup ---
 Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Secure AI Backend")
+
+# --- Schemas ---
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class TokenResponse(BaseModel):
+    token: str
 
 # --- CORS ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Adjust for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# --- Startup Event ---
 @app.on_event("startup")
 async def startup_event():
     await initialize_ai_client()
@@ -32,22 +42,41 @@ async def startup_event():
 async def get_current_user_from_token(websocket: WebSocket, token: str = Query(...)):
     username = decode_access_token(token)
     if username is None:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        # Don't accept the connection if token is invalid
         return None
     return username
+
+# --- REST API (Login Endpoint) ---
+@app.post("/api/v1/auth/login", response_model=TokenResponse)
+async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == credentials.username).first()
+    if user is None or user.hashed_password != credentials.password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+    token = create_access_token(user_id=user.username)
+    return TokenResponse(token=token)
 
 # --- WebSocket Endpoint ---
 @app.websocket("/api/v1/ai/chat")
 async def websocket_endpoint(
     websocket: WebSocket,
-    username: str = Depends(get_current_user_from_token),
+    token: str = Query(...) # Extract token from query params
 ):
-    if not username: return
-    await websocket.accept()
+    # Authenticate immediately
+    username = decode_access_token(token)
+    if username is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
 
-    # Initialize memory if it doesn't exist
+    await websocket.accept()
+    
+    # Requirement: AI Memory initialization
     if username not in USER_CONTEXT_STORE:
         USER_CONTEXT_STORE[username] = []
+
+    print(f"🟢 {username} connected")
 
     try:
         while True:
