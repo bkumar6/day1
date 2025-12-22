@@ -1,52 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Day 1 – AI Chat System</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <title>AI Knowledge System – RAG Interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- LOGIN -->
-  <div id="login-box" class="card">
-    <h2>Login</h2>
-
-    <label>Username</label>
-    <input id="username" autocomplete="username" />
-
-    <label>Password</label>
-    <input id="password" type="password" autocomplete="current-password" />
-
-    <button onclick="login()">Login</button>
-    <p id="login-error" class="error"></p>
-  </div>
-
-  <!-- CHAT -->
-  <div id="chat-box" class="card" style="display:none;">
-    <div class="chat-header">
-      <h2>AI Chat Logs</h2>
-      <button class="secondary" onclick="clearLogs()">Clear Logs</button>
+    <div id="login-box" class="card">
+        <h2>Systems Login</h2>
+        <div class="input-group">
+            <label>Username</label>
+            <input id="username" type="text" placeholder="Enter username" autocomplete="username">
+        </div>
+        <div class="input-group">
+            <label>Password</label>
+            <input id="password" type="password" placeholder="Enter password" autocomplete="current-password">
+        </div>
+        <button class="primary-btn" onclick="login()">Access System</button>
+        <p id="login-error" class="error"></p>
     </div>
 
-    <!-- LOG BOX -->
-    <div id="messages" class="log-container"></div>
+    <div id="chat-box" class="card main-interface" style="display:none;">
+        <div class="chat-header">
+            <div class="title-area">
+                <h2>AI Assistant</h2>
+                <span id="kb-badge" class="badge">General Mode</span>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="toggleModal(true)" title="Upload Knowledge">📁 Manage Knowledge</button>
+                <button class="icon-btn" onclick="clearLogs()" title="Clear Chat">🧹 Clear</button>
+            </div>
+        </div>
 
-    <!-- INPUT ROW -->
-    <div class="input-row">
-      <input id="message-input" placeholder="Type your question..." />
-      <button onclick="sendMessage()">Send</button>
+        <div class="mode-selector">
+            <label class="switch">
+                <input type="checkbox" id="mode-toggle" onchange="toggleChatMode()">
+                <span class="slider round"></span>
+            </label>
+            <span id="mode-label">Standard Memory Mode</span>
+        </div>
+
+        <div id="messages" class="log-container"></div>
+
+        <div class="input-row">
+            <input id="message-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+            <button id="send-btn" class="primary-btn" onclick="sendMessage()">Send</button>
+        </div>
     </div>
-  </div>
 
-  <script src="app.js"></script>
+    <div id="upload-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Vectorize Essay Content</h3>
+                <span class="close-btn" onclick="toggleModal(false)">&times;</span>
+            </div>
+            
+            <p class="subtitle">Paste your essay text below to feed the Qdrant Vector DB for RAG queries.</p>
+            
+            <textarea id="text-block-input" 
+                      placeholder="Paste essay text here..." 
+                      oninput="updateCharCount()"
+                      maxlength="10000"></textarea>
+            
+            <div class="stats-row">
+                <span id="char-count">0 / 10,000</span>
+                <div id="upload-status">Ready to process</div>
+            </div>
 
-  <!-- Small UX helper -->
-  <script>
-    function clearLogs() {
-      document.getElementById("messages").innerHTML = "";
-    }
-  </script>
+            <div class="progress-container" id="progress-wrapper" style="display:none;">
+                <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="secondary-btn" onclick="toggleModal(false)">Cancel</button>
+                <button id="process-btn" class="primary-btn" onclick="uploadTextBlock()">Vectorize Now</button>
+            </div>
+        </div>
+    </div>
 
+    <script src="app.js"></script>
+    <script>
+        // Simple UI-only helpers that don't need to be in app.js
+        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+        
+        function toggleChatMode() {
+            const isRag = document.getElementById('mode-toggle').checked;
+            const label = document.getElementById('mode-label');
+            const input = document.getElementById('message-input');
+            const badge = document.getElementById('kb-badge');
+
+            if (isRag) {
+                label.innerText = "Essay RAG Mode";
+                input.placeholder = "Ask a question about the uploaded essay...";
+                badge.innerText = "RAG Active";
+                badge.style.background = "#ebf8ff";
+                badge.style.color = "#3182ce";
+            } else {
+                label.innerText = "Standard Memory Mode";
+                input.placeholder = "Type your message...";
+                badge.innerText = "General Mode";
+                badge.style.background = "#f1f5f9";
+                badge.style.color = "#718096";
+            }
+        }
+    </script>
 </body>
 </html>
